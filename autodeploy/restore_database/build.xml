@@ -1,0 +1,161 @@
+<!-- 
+$Revision$
+
+Copyright (c) 2014 by PROS, Inc.  All Rights Reserved.
+This software is the confidential and proprietary information of
+PROS , Inc. ("Confidential Information").
+You shall not disclose such Confidential Information and shall use it
+only in accordance with the terms of the license agreement you entered
+into with PROS.
+
+@Author  jmaguina
+
+-->
+
+<project name="RestoreDatabase" basedir="." default="main">
+
+<!-- Restore Database -->
+
+    <target name="init">
+        <record name="logfile.log" action="start" append="false"/>
+    </target>
+    <target name="exit">
+        <record name="logfile.log" action="stop"/>
+    </target>
+
+    <property name="database_values" value="none"/>
+
+    <property name="database_name" value="${database_name}"/>
+    <property name="backup_file" value="${backup_file}"/>
+    <property name="files_folder" value="${files_folder}"/>
+    <property name="restore.sql" value="restore.sql"/>
+    <property name="command.sql" value="command.sql"/>
+    <property name="database.var" value="database_name"/>
+    <property name="bak_file.var" value="database_file_backup"/>
+    <property name="files_folder.var" value="files_folder"/>
+    <property name="instance_name" value="${instance_name}"/>
+    <property name="ftp_user" value="pros_user"/>
+    <property name="ftp_pwd" value="prosu53r"/>
+    <property name="db_scf_folder" value="${db_scf_folder}"/>
+    <property name="remote_db_scf_folder" value="${remote_db_scf_folder}"/>
+    <property name="file_server" value="${file_server}"/>
+    
+    <!-- Download Database backup and SCF file -->
+    
+    <!-- Delete db_backup folder if it exists -->
+    <target name="dir_check">
+        <condition property="dir_exists">
+            <available file="${db_scf_folder}" type="dir"/>
+        </condition>
+    </target>
+    
+    <target name="delete_db_backup_folder" depends="dir_check" if="dir_exists">
+        <delete dir="${db_scf_folder}"/>
+    </target>
+    
+    <target name="create_db_backup_folder">
+        <mkdir dir="${db_scf_folder}"/>
+    </target>
+    
+    <!-- Database -->
+    <target name="copy_db_backup">
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${file_server}/${remote_db_scf_folder}/${backup_file}"
+        dest="${db_scf_folder}"/>
+    </target>
+
+    <!-- Database user-->
+    <property name="database_user" value="pros_user"/>
+    <property name="database_password" value="prosu53r"/>
+
+
+    <target name="restore_db">
+        <exec executable="sqlcmd.exe" failonerror="true">
+            <arg value="-b"/>
+            <arg value="-U"/>
+            <arg value="${database_user}"/>
+            <arg value="-P"/>
+            <arg value="${database_password}"/>
+            <arg value="-S"/>
+            <arg value="${instance_name}"/>
+            <arg value="-v"/>
+            <arg value="${database.var}=&quot;${database_name}&quot;"/>
+            <arg value="-i"/>
+            <arg value="&quot;${restore.sql}&quot;"/>
+        </exec>
+    </target>
+    
+    <target name="execute_restore_command">
+        <exec executable="sqlcmd.exe" failonerror="true">
+            <arg value="-b"/>
+            <arg value="-U"/>
+            <arg value="${database_user}"/>
+            <arg value="-P"/>
+            <arg value="${database_password}"/>
+            <arg value="-S"/>
+            <arg value="${instance_name}"/>
+            <arg value="-v"/>
+            <arg value="${database.var}=&quot;${database_name}&quot;"/>
+            <arg value="-v"/>
+            <arg value="${bak_file.var}=&quot;'C:/db_backup_scf/'&quot;"/>
+            <arg value="-v"/>
+            <arg value="${files_folder.var}=&quot;'${files_folder}\'&quot;"/>
+            <arg value="-i"/>
+            <arg value="&quot;${command.sql}&quot;"/>
+        </exec>
+    </target>
+
+    <target name="restore_database">
+    <antcall target="init"/>
+        <antcall target="restore_db"/>
+        <antcall target="execute_restore_command"/>
+        <antcall target="exit"/>
+    </target>
+
+<!-- Optional queries-->
+    <property name="optional_query" value="${optional_query}"/>
+    <property name="queries_folder" value="${queries_folder}"/>
+    
+    <target name="string_check">
+        <condition property="non_empty_string">
+            <not>
+                <equals arg1="${optional_query}" arg2= ""/>
+            </not>
+        </condition>
+    </target>
+    
+    <target name="copy_optional_query" depends="string_check" if="non_empty_string">
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${file_server}/${queries_folder}/${optional_query}"
+        dest="C:/"/>
+    </target>
+    
+    <target name="run_optional_queries" depends="string_check" if="non_empty_string">
+        <exec executable="sqlcmd.exe" failonerror="true">
+            <arg value="-b"/>
+            <arg value="-U"/>
+            <arg value="${database_user}"/>
+            <arg value="-P"/>
+            <arg value="${database_password}"/>
+            <arg value="-S"/>
+            <arg value="${instance_name}"/>
+            <arg value="-v"/>
+            <arg value="${database.var}=&quot;${database_name}&quot;"/>
+            <arg value="-i"/>
+            <arg value="&quot;${optional_query}&quot;"/>
+        </exec>
+    </target>
+
+    <target name="delete_sql_files">
+        <delete>
+        <fileset dir="." includes="**/*.sql"/>
+        </delete>
+    </target>
+
+    <target name="delete_build_file">
+        <delete file="build.xml"/>
+    </target>
+
+    <target name="post_execution" depends="delete_sql_files, delete_build_file"/>
+
+    <target name="main" depends="delete_db_backup_folder, create_db_backup_folder, copy_db_backup, restore_database, copy_optional_query, run_optional_queries, post_execution"/>
+
+</project>

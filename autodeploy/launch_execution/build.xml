@@ -1,0 +1,185 @@
+<!-- 
+  $Revision$
+
+  Copyright (c) 2014 by PROS, Inc.  All Rights Reserved.
+  This software is the confidential and proprietary information of
+  PROS , Inc. ("Confidential Information").
+  You shall not disclose such Confidential Information and shall use it
+  only in accordance with the terms of the license agreement you entered
+  into with PROS.
+
+  @Author  jmaguina
+  
+-->
+
+<!-- Launch execution -->
+
+<project name="Execution" basedir="." default="main">
+
+    <property name="ftp_user" value="atf_user"/>
+    <property name="ftp_pwd" value="atf_u53r"/>
+    
+<!-- Delete PAF folder -->
+    
+    <property name="paf_folder_path" value="${paf_folder_path}"/>
+
+    <target name="delete_paf_folder">
+        <delete dir="${paf_folder_path}"/>
+    </target>
+	
+<!-- Copy PAF -->
+
+    <property name="paf_file" value="${paf_file}"/>
+    <property name="paf_build_folder" value="${paf_build_folder}"/>
+    
+    <target name="copy_paf">
+    <mkdir dir="${paf_folder_path}"/>
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${paf_file_server}/${paf_build_folder}/${paf_file}"
+             dest="${paf_folder_path}"/>
+    </target>
+    
+<!-- Extract PAF files -->
+
+    <property name="paf_folder_destination" value="${paf_folder_destination}"/>
+    
+    <target name="create_dir">
+        <mkdir dir="${paf_folder_destination}"/>
+    </target>   
+    
+    <target name="unpack_paf">
+        <antcall target="create_dir"/>
+        <unzip src="${paf_folder_path}/${paf_file}" dest="${paf_folder_destination}" />
+    </target>
+    
+<!-- Copy PPSS -->
+   
+    <target name="copy_ppss">
+        <copy todir="${paf_folder_destination}\paf-ppss">
+            <fileset dir="${job_workspace}/paf-ppss" />
+        </copy>
+    </target>
+
+<!-- Copy config.txt -->
+
+    <target name="copy_config">
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${file_server}/${config_path}/config.txt"
+             dest="${config_folder}"/>
+    </target>
+
+<!-- Copy custom batch files -->
+
+    <target name="copy_custom_batch">
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${file_server}/temp/paf_batch_files/${execution_batch}"
+             dest="${batch_folder}"/>
+    </target>
+
+<!-- Execute custom batch file -->
+
+    <target name="execute_custom_bat">
+        <echo message="Execute batch file" />
+        <exec dir="${batch_folder}" executable="cmd" >
+            <arg line="/c ${execution_batch}" />
+        </exec>
+    </target>
+
+<!-- Copy runner batch file -->
+    <target name="copy_runner">
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${file_server}/temp/paf_batch_files/run.bat"
+             dest="${batch_folder}"/>
+    </target>
+    
+<!-- Execute runner file -->
+
+    <target name="execute_runner">
+        <echo message="Execute runner file" />
+        <exec dir="${batch_folder}" executable="cmd" >
+            <arg line="/c run.bat" />
+            <arg line="${module}" />
+            <arg line="${execution_batch}" />
+        </exec>
+    </target>
+    
+<!-- Condition -->
+
+    <target name="option_check">
+        <condition property="option_yes">
+            <equals arg1="${use_default_batch}" arg2= "yes"/>
+        </condition>
+        <condition property="option_no">
+            <equals arg1="${use_default_batch}" arg2= "no"/>
+        </condition>
+    </target>
+    
+<!-- Copy batch -->
+
+    <target name="verify_runner_option" depends="option_check" if="option_yes">
+        <antcall target="copy_runner"/>
+    </target>
+    
+    <target name="verify_custom_batch_option" depends="option_check" if="option_no">
+        <antcall target="copy_custom_batch"/>
+    </target>
+    
+    <target name="copy_batch">
+        <antcall target="verify_runner_option"/>
+        <antcall target="verify_custom_batch_option"/>
+    </target>
+
+<!-- Execute batch -->
+
+    <target name="verify_runner_execution" depends="option_check" if="option_yes">
+        <antcall target="execute_runner"/>
+    </target>
+    
+    <target name="verify_custom_batch_execution" depends="option_check" if="option_no">
+        <antcall target="execute_custom_bat"/>
+    </target>
+    
+    <target name="execute_bat">
+        <antcall target="verify_runner_execution"/>
+        <antcall target="verify_custom_batch_execution"/>
+    </target>
+
+<!-- Copy Logs -->
+
+    <property name="move_folder_setup" value="send_files.bat"/> 
+    <property name="logs_destination" value="${logs_destination}"/>
+    <property name="logs_source" value="${logs_source}"/>
+    <property name="script_folder" value="C:\script_folder"/>
+    <property name="win_cmd" location="C:\Windows\System32\cmd.exe"/> 
+
+    <tstamp>
+    <format property="today" pattern="MM-d-yyyy-hh-mm" locale="en,GB"/>
+    </tstamp>
+
+    <property name="remote_folder_name" value="${paf_build_name}_${ppss_build_name}_${today}"/> 
+    
+    <target name="create_remote_folder">
+        <sshexec host="${file_server}"
+        trust="true"
+        username="atf_user"
+        password="atf_u53r"
+        command="mkdir ${complete_logs_destination}/${remote_folder_name}"/>
+    </target>
+    
+    <target name="move_folder">
+        <antcall target="create_remote_folder"/>
+        <ftp server="${file_server}"
+             remotedir="${logs_destination}/${remote_folder_name}"
+             userid="atf_user"
+             password="atf_u53r">
+            <fileset dir="${logs_source}"/>
+        </ftp>
+    </target>
+
+    <target name="launchRegression">
+        <antcall target="delete_paf_folder"/>
+        <antcall target="copy_paf"/>
+        <antcall target="unpack_paf"/>
+        <antcall target="copy_ppss"/>
+        <antcall target="copy_config"/>
+        <antcall target="copy_batch"/>
+        <antcall target="execute_bat"/>
+    </target>
+
+</project>

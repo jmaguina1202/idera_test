@@ -1,0 +1,393 @@
+<!-- 
+$Revision$
+
+Copyright (c) 2014 by PROS, Inc.  All Rights Reserved.
+This software is the confidential and proprietary information of
+PROS , Inc. ("Confidential Information").
+You shall not disclose such Confidential Information and shall use it
+only in accordance with the terms of the license agreement you entered
+into with PROS.
+
+@Author  jmaguina
+
+-->
+
+<project name="InstallApplication" basedir="." default="main">
+
+<!-- Start PPSS application -->
+
+    <property name="installation_directory" value="${installation_directory}"/>
+
+    <property name="bin_app_dir" value="build/bin"/>
+    <property name="prosshell_windows" location="${installation_directory}/${bin_app_dir}/prosshell.bat"/>
+    <property name="prosshell_linux" location="${installation_directory}/${bin_app_dir}/prosshell"/>
+    <property name="sh_cmd" location="/bin/sh"/>
+    <property name="win_cmd" location="C:/Windows/System32/cmd.exe"/>
+
+    <condition property="isWindows">
+        <os family="windows" />
+    </condition>
+    <condition property="isLinux">
+        <os family="unix" />
+    </condition>
+
+    <target name="start_app_windows" if="isWindows">
+        <exec executable="${prosshell_windows}" failonerror="false" dir="${installation_directory}/${bin_app_dir}">
+            <arg value="startall"/>
+        </exec>
+    </target>
+
+    <target name="start_app_linux" if="isLinux">
+        <exec executable="${prosshell_linux}" failonerror="true" dir="${installation_directory}/${bin_app_dir}">
+            <arg value="startall"/>
+        </exec>
+    </target>
+    
+    <target name="start_app" depends="start_app_linux, start_app_windows"/>
+
+<!-- Stop PPSS application -->
+
+    <condition property="isWindows">
+        <os family="windows" />
+    </condition>
+    <condition property="isLinux">
+        <os family="unix" />
+    </condition>
+
+    <target name="dir_check">
+        <condition property="dir_exists">
+            <available file="${installation_directory}/${bin_app_dir}" type="dir"/>
+        </condition>
+    </target>
+
+    <target name="stop_app_windows" if="isWindows">
+        <exec executable="${prosshell_windows}" failonerror="false" dir="${installation_directory}/${bin_app_dir}">
+            <arg value="stopall"/>
+        </exec>
+    </target>
+
+    <target name="stop_app_linux" if="isLinux">
+        <echo message="Stop PPSS application" />
+        <exec executable="${prosshell_linux}" failonerror="false" dir="${installation_directory}/${bin_app_dir}">
+            <arg value="stopall"/>
+        </exec>
+    </target>
+
+    <target name="stop_app" depends="stop_app_linux, stop_app_windows"/>
+
+    <target name="execute_stop_app" depends="dir_check" if="dir_exists">
+	<antcall target="stop_app"/>
+    </target>
+
+<!-- Delete folder-->
+    <property name="destination_directory" value="${destination_directory}"/>
+
+    <target name="delete_folder">
+        <delete dir="${destination_directory}"/>
+        <mkdir dir="${destination_directory}"/>
+    </target>
+	
+<!-- Copy build-->
+    <property name="file_name" value="${file_name}"/>
+    <property name="file_server" value="${file_server}"/>
+    <property name="file_root" value="${file_root}"/>
+    <property name="ftp_user" value="pros_user"/>
+    <property name="ftp_pwd" value="prosu53r"/>
+    <property name="remote_db_scf_folder" value="${remote_db_scf_folder}"/>
+    <property name="scf_file" value="scf_file"/>
+    <property name="scf_destination" value="${scf_destination}"/>
+    
+    <target name="copy_build">
+    <mkdir dir="${destination_directory}"/>
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${file_server}/${file_root}/${file_name}"
+             dest="${destination_directory}"/>
+    </target>
+    
+<!-- Copy scf file-->
+     <target name="scf_dir_check">
+        <condition property="dir_exists">
+            <available file="${scf_destination}" type="dir"/>
+        </condition>
+    </target>
+    
+    <target name="delete_db_backup_folder" depends="scf_dir_check" if="dir_exists">
+        <delete dir="${scf_destination}"/>
+    </target>
+    
+    <target name="create_db_backup_folder">
+        <mkdir dir="${scf_destination}"/>
+    </target>
+     
+    <target name="copy_scf">
+        <antcall target="delete_db_backup_folder"/>
+        <antcall target="create_db_backup_folder"/>
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${file_server}/${remote_db_scf_folder}/${scf_file}"
+        dest="${scf_destination}"/>
+    </target>
+    
+<!-- Untar file-->
+    <property name="folder_destination" value="${folder_destination}"/>
+   
+    <target name="create_dir">
+        <mkdir dir="${destination_directory}/${folder_destination}"/>
+    </target>   
+    
+    <target name="unpack">
+        <untar src="${destination_directory}/${file_name}" dest="${destination_directory}/${folder_destination}" compression="gzip"/>
+    </target>
+
+    <target name="untar">
+        <antcall target="create_dir"/>
+        <antcall target="unpack"/>
+    </target>
+
+    
+<!-- Install PPSS-->
+    <property name="installer_directory" value="${installer_directory}"/>
+    <property name="scf_folder" value="${scf_folder}"/>
+    <property name="java_path" value="${java_path}"/>
+    <property name="i18n_src_folder" value="${i18n_src_folder}"/>
+    <property name="installer_path" value="${installer_path}"/>
+
+    <property name="monitor_setup" value="pros_monitor.bat"/> 
+    <property name="post_installation_windows" value="delete_backup.bat"/>
+    <property name="post_installation_linux" value="post_installation_linux.sh"/>
+    <property name="installer_properties" value="installer.properties"/>
+    <property name="win_cmd" location="C:\Windows\System32\cmd.exe"/>
+    <property name="sh_cmd" location="/bin/sh"/> 
+    <property name="i18n_app_dir" value="build/config/i18n"/>
+    <property name="workflow_dir" value="build/config/workflow/jbpm"/>
+    <property name="bin_app_dir" value="build/bin"/>
+
+    <property name="depot_folder" value="depot"/>
+    <property name="output_folder" value="output"/>
+    <property name="property_cache_fname" value="installer.properties.cache"/>
+    <property name="installer_image" value="install.jar"/>
+    <property name="property_file_name" value="installer.properties"/>
+
+    <property name="db_type" value="SqlServer"/>
+    <property name="db_pwd" value="&amp;8@~GM|1Q?)$DOLLAR$x%`QN#"/>
+
+    <property name="install_log" value="pros_install.log"/>
+    <property name="message_log" value="pros_install_message.log"/>
+
+    <property name="rmi_registry_port" value="${rmi_registry_port}"/>
+    <property name="connect_port" value="${connect_port}"/>
+    <property name="ajp_port" value="${ajp_port}"/>
+    <property name="shutdown_port" value="${shutdown_port}"/>
+    <property name="db_port" value="${db_port}"/>
+    <property name="db_user" value="${db_user}"/>
+    <property name="application_server_name" value="${application_server_name}"/>
+    
+
+    <condition property="isWindows">
+        <os family="windows" />
+    </condition>
+    <condition property="isLinux">
+        <os family="unix" />
+    </condition>
+
+    <target name="install_windows" if="isWindows">
+        <antcall target="set_installer_properties"/>
+        <antcall target="clean_installation_folder"/>
+        <antcall target="launch_win_installation"/>
+        <antcall target="set_monitor"/>
+        <antcall target="monitoring"/>
+        <antcall target="copy_i18n"/>
+        <antcall target="set_workflow_files"/>
+        <antcall target="db_patches_windows"/>
+        <antcall target="post_installation_windows"/>
+    </target>
+
+    <target name="install_linux" if="isLinux">
+        <antcall target="set_installer_properties"/>
+        <antcall target="clean_installation_folder"/>
+        <antcall target="launch_linux_installation"/>
+        <antcall target="copy_i18n"/>
+        <antcall target="set_workflow_files"/>
+        <antcall target="db_patches_linux"/>
+        <antcall target="post_installation_linux"/>
+    </target>
+
+    <target name="install" depends="install_linux, install_windows"/>
+        
+    <target name="set_installer_properties">
+        <sleep seconds="40"/>
+        <delete file="${installer_directory}/installer.properties"/>
+        <copy file="${installer_properties}" tofile="${installer_directory}/installer.properties" force="true"/>  
+        <propertyfile file="${installer_directory}/installer.properties" comment="Application property file generated"> 
+            <entry  key="PROS_HOSTNAME" value="${application_server_name}"/>
+            <entry  key="PROS_PNAME_SCF_FILENAME" value="${scf_folder}"/>
+            <entry  key="PROS_DB_SETUP" value="-dt &quot;SqlServer&quot; -sf &quot;${scf_folder}&quot;"/>
+            <entry  key="PROS_MID_INSTALL" value="-jh &quot;${java_path}&quot; -sf &quot;${scf_folder}&quot; -deployaar &quot;YES&quot; -ear &quot;NO&quot;"/>
+
+            <entry  key="USER_INSTALL_DIR" value="${installation_directory}"/>
+            <entry  key="PROS_PNAME_PROSRM.RMI.REGISTRY.HOST" value="${application_server_name}"/>
+            <entry  key="PROS_PNAME_PROSRM.RMI.REGISTRY.PORT" value="${rmi_registry_port}"/>
+            <entry  key="PROS_PNAME_TOMCAT.CONNECT.PORT" value="${connect_port}"/>
+            <entry  key="PROS_PNAME_TOMCAT.AJP.PORT" value="${ajp_port}"/>
+            <entry  key="PROS_PNAME_TOMCAT.SHUTDOWN.PORT" value="${shutdown_port}"/>
+            <entry  key="PROS_LOG_DIR" value="${installation_directory}"/> 
+            <entry  key="PROS_PNAME_DATABASENAME" value="${database_name}"/>
+            <entry  key="PROS_PNAME_DATALOADERDIR" value="${installation_directory}/${depot_folder}"/>
+            <entry  key="PROS_PNAME_OUTDIR" value="${installation_directory}/${output_folder}"/>
+            
+            
+            <entry  key="PROS_INSTALLER_CACHE_FILE" value="${installer_directory}/${property_cache_fname}"/>
+            <entry  key="PROS_INSTALLER_IMAGE" value="${installer_directory}/${installer_image}"/>
+            <entry  key="PROS_INSTALLER_PROPERTIES_FILE" value="${installer_directory}/${property_file_name}"/>
+            
+            <entry  key="PROS_DB_SETUP" value="-dt &quot;${db_type}&quot; -sf &quot;${scf_folder}&quot;"/>
+            <entry  key="PROS_PNAME_DATABASEPASSWORD" value="${db_pwd}"/>
+            <entry  key="PROS_PNAME_DATABASEPORT" value="${db_port}"/>
+            <entry  key="PROS_PNAME_DATABASESERVER" value="${instance_name}"/>
+            <entry  key="PROS_PNAME_DATABASEUSERID" value="${db_user}"/>
+            <entry  key="PROS_PNAME_DB_TYPE" value="${db_type}"/>
+            
+            <entry  key="PROS_PNAME_JAVA.HOME" value="${java_path}"/>
+            <entry  key="PROS_PNAME_SCF_FILENAME" value="${scf_folder}"/>
+            
+            <entry  key="PROS_MID_INSTALL" value="-jh &quot;${java_path}&quot; -sf &quot;${scf_folder}&quot; -deployaar &quot;YES&quot; -ear &quot;NO&quot;"/>
+            <entry  key="PROS_RESERVED_ARGUMENTS" value="-l &quot;${installation_directory}/${install_log}&quot; -m &quot;${installation_directory}/${message_log}&quot; -p &quot;${installation_directory}&quot; -im 1 -ag 1"/>
+            <entry  key="PROS_ARGUMENTS" value="-dd &quot;YES&quot; -deployaar &quot;YES&quot; -l &quot;${installation_directory}/${install_log}&quot; -m &quot;${installation_directory}/${message_log}&quot; -p &quot;${installation_directory}&quot; -im 1 -ag 1"/>
+
+        </propertyfile>
+    </target>
+
+    <target name="clean_installation_folder">
+        <delete dir="${installation_directory}"/>
+    </target>
+
+    <!-- Windows installation -->
+    <target name="launch_win_installation" if="isWindows">
+        <echo message="Launch installation on 'Windows' system" />
+        <exec executable="${win_cmd}" dir="${installer_directory}" failonerror="true">
+            <arg value="/c"/>
+            <arg value="setup.exe"/>
+            <arg value="-ui"/>
+            <arg value="silent"/>
+        </exec>
+    </target>
+
+    <target name="set_monitor">
+        <!-- Copy a monitor program for windows installation -->
+        <sleep seconds="40"/>
+        <copy file="${monitor_setup}" todir="${installation_directory}" force="true"/>   
+    </target>
+
+        <!-- Monitor until PPSS windows installtion ends -->
+    <target name="monitoring">
+        <exec executable="${win_cmd}" dir="${installation_directory}" failonerror="true">
+            <arg value="/c"/>
+            <arg value="${installation_directory}\pros_monitor.bat"/>
+            <arg value="${installation_directory}"/>
+        </exec>
+    </target>
+
+    <!-- Linux installation -->
+    <target name="launch_linux_installation" if="isLinux">
+    	<echo message="Launch installation on 'Linux' system" />
+        <exec executable="${sh_cmd}" dir="${installer_directory}" failonerror="true">
+            <arg value="setup.sh"/>
+            <arg value="-ui"/>
+            <arg value="silent"/>
+        </exec>
+    </target>
+    
+    <target name="empty_string_check">
+        <condition property="not_empty_string">
+            <not>
+                <equals arg1="${i18n_src_folder}" arg2= ""/>
+            </not>
+        </condition>
+    </target>
+    
+    <target name="i18n_check" depends="empty_string_check" if="not_empty_string">
+        <condition property="i18n_exists">
+            <available file="${i18n_src_folder}" type="dir" />
+        </condition>
+    </target>
+    
+    <target name="copy_i18n" depends="i18n_check" if="i18n_exists">
+        <copy todir="${installation_directory}/${i18n_app_dir}" force="true">
+            <fileset dir="${i18n_src_folder}/"/>
+        </copy>
+    </target>
+    
+
+    <target name="set_workflow_files" depends="file_checks, set_deal_file, set_pricelist_file"/>
+
+    <target name="file_checks">
+        <available file="${installation_directory}/${workflow_dir}/Deal.xml.default"  property="first.file.found"/>
+        <available file="${installation_directory}/${workflow_dir}/PriceList.xml.default" property="second.file.found"/>
+    </target>
+
+    <target name="set_deal_file" if="first.file.found">
+        <move file="${installation_directory}/${workflow_dir}/Deal.xml.default" tofile="${installation_directory}/${workflow_dir}/Deal.xml" force="true"/>
+    </target>
+
+    <target name="set_pricelist_file" if="second.file.found">
+        <move file="${installation_directory}/${workflow_dir}/PriceList.xml.default" tofile="${installation_directory}/${workflow_dir}/PriceList.xml"/>
+    </target>
+
+    <target name="db_patches_windows" if="isWindows">
+        <exec executable="${win_cmd}" dir="${installation_directory}/${bin_app_dir}" failonerror="true">
+            <arg value="/c"/>
+            <arg value="applyDBPatches.bat"/>
+        </exec>
+    </target>
+    
+    <target name="db_patches_linux" if="isLinux">
+        <exec executable="${sh_cmd}" dir="${installation_directory}/${bin_app_dir}" failonerror="true">
+            <arg value="applyDBPatches.sh"/>
+        </exec>
+    </target>
+	
+    <target name="apply_db_patches" depends="db_patches_windows, db_patches_linux"/>
+    
+    <!-- Linux post installation actions-->
+    
+    <target name="post_installation_linux">
+        <exec executable="${sh_cmd}" failonerror="true">
+            <arg value="delete_ppss_backup.sh"/>
+            <arg value="&quot;${installation_directory}&quot;"/>
+        </exec>
+	<delete file="delete_ppss_backup.sh"/>
+    </target>
+    
+    <!-- Windows post installation actions-->
+    
+    <target name="copy_unlocker">
+        <get src="ftp://${ftp_user}:${ftp_pwd}@${file_server}/${remote_unlocker_path}/unlocker.zip"
+        dest="C:/"/>
+    </target>
+    
+    <target name="extract_unlocker">
+        <unzip src="C:/unlocker.zip" dest="C:/" />
+    </target>
+    
+    <target name="post_installation_windows">
+        <antcall target="copy_unlocker"/>
+        <antcall target="extract_unlocker"/>
+		<loadresource property="installer_path_corrected">
+            <propertyresource name="installer_path"/>
+            <filterchain>
+                <tokenfilter>
+                    <filetokenizer/>
+                    <replacestring from="//" to="\"/>
+                </tokenfilter>
+            </filterchain>
+        </loadresource>
+        <exec executable="${win_cmd}" failonerror="true">
+            <arg value="/c"/>
+            <arg value="delete_ppss_backup.bat"/>
+            <arg value="&quot;${installation_directory}_bak&quot;"/>
+            <arg value="&quot;${installer_path_corrected}&quot;"/>
+        </exec>
+		<echo message="${installer_path_corrected}" />
+    <delete file="delete_ppss_backup.bat"/>
+    </target>
+
+   <target name="main" depends="copy_scf, copy_build, untar, install, start_app"/>
+
+</project>
